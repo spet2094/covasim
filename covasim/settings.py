@@ -53,8 +53,11 @@ def set_default_options():
     optdesc.precision = 'Set arithmetic precision for Numba -- 32-bit by default for efficiency'
     options.precision = int(os.getenv('COVASIM_PRECISION', 32))
 
-    optdesc.numba_parallel = 'Set Numba multithreading -- about 20% faster, but simulations become nondeterministic'
-    options.numba_parallel = bool(int(os.getenv('COVASIM_NUMBA_PARALLEL', 0)))
+    optdesc.numba_parallel = 'Set Numba multithreading -- none, safe, full; full multithreading is ~20% faster, but results become nondeterministic'
+    options.numba_parallel = str(os.getenv('COVASIM_NUMBA_PARALLEL', 'none'))
+
+    optdesc.numba_cache = 'Set Numba caching -- saves on compilation time, but harder to update'
+    options.numba_cache = bool(int(os.getenv('COVASIM_NUMBA_CACHE', 1)))
 
     return options, optdesc
 
@@ -65,7 +68,7 @@ orig_options = sc.dcp(options) # Make a copy for referring back to later
 
 # Specify which keys require a reload
 matplotlib_keys = ['font_size', 'font_family', 'dpi', 'backend']
-numba_keys = ['precision', 'numba_parallel']
+numba_keys = ['precision', 'numba_parallel', 'numba_cache']
 
 
 def set_option(key=None, value=None, **kwargs):
@@ -90,7 +93,8 @@ def set_option(key=None, value=None, **kwargs):
         - backend:        which Matplotlib backend to use
         - interactive:    convenience method to set show, close, and backend
         - precision:      the arithmetic to use in calculations
-        - numba_parallel: whether to parallelize Numba
+        - numba_parallel: whether to parallelize Numba functions
+        - numba_cache:    whether to cache (precompile) Numba functions
 
     **Examples**::
 
@@ -119,7 +123,6 @@ def set_option(key=None, value=None, **kwargs):
             kwargs['backend'] = orig_options['backend']
         else:
             kwargs['show'] = False
-            kwargs['close'] = True
             kwargs['backend'] = 'agg'
 
     # Reset options
@@ -141,6 +144,11 @@ def set_option(key=None, value=None, **kwargs):
     if reload_required:
         reload_numba()
     return
+
+
+def get_default(key=None):
+    ''' Helper function to get the original default options '''
+    return orig_options[key]
 
 
 def get_help(output=False):
@@ -185,9 +193,9 @@ def set_matplotlib_global(key, value):
     ''' Set a global option for Matplotlib -- not for users '''
     import pylab as pl
     if value: # Don't try to reset any of these to a None value
-        if   key == 'font_size':   pl.rc('font', size=value)
-        elif key == 'font_family': pl.rc('font', family=value)
-        elif key == 'dpi':         pl.rc('figure', dpi=value)
+        if   key == 'font_size':   pl.rcParams['font.size']   = value
+        elif key == 'font_family': pl.rcParams['font.family'] = value
+        elif key == 'dpi':         pl.rcParams['figure.dpi']  = value
         elif key == 'backend':     pl.switch_backend(value)
         else: raise sc.KeyNotFoundError(f'Key {key} not found')
     return
@@ -207,7 +215,7 @@ def handle_show(do_show):
 def reload_numba():
     '''
     Apply changes to Numba functions -- reloading modules is necessary for
-    changes to propagate. Not necessary if cv.options.set() is used.
+    changes to propagate. Not necessary to call directly if cv.options.set() is used.
 
     **Example**::
 
@@ -223,9 +231,11 @@ def reload_numba():
     importlib.reload(cv.defaults)
     importlib.reload(cv.utils)
     importlib.reload(cv)
+    print("Reload complete. Note: for some options to take effect, you may also need to delete Covasim's __pycache__ folder.")
     return
 
 
 # Add these here to be more accessible to the user
 options.set = set_option
+options.get_default = get_default
 options.help = get_help

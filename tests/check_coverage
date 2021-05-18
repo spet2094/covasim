@@ -2,12 +2,12 @@
 # Note that although the script runs when parallelized, the coverage results are wrong.
 
 echo 'Running tests...'
-coverage run --source=../covasim -m pytest test_*.py
+pytest -v test_*.py --cov-config=.coveragerc --cov=../covasim --workers auto --durations=0
 
 echo 'Creating HTML report...'
 coverage html
 
-echo 'Running report...'
+echo 'Printing report...'
 coverage report
 
 echo 'Report location:'
